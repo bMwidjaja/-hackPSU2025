@@ -1,0 +1,18 @@
+[project]
+name = "hack-psu-2025-backend"
+version = "0.1.0"
+description = "Add your description here"
+authors = [
+    {name = "Paul Hong", email = "paulhong3927@gmail.com"},
+    {name = "Brandon Widjaja", email = "something@gmail.com"},
+    {name = "Santiago Pineda", email = "spineda1208@gmail.com"},
+]
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi[standard]>=0.115.12",
+]
+
+[lint]
+ignore = ["F401"]
+select = ["E", "F", "I"]
