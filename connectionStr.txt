@@ -1,0 +1,1 @@
+mongosh "mongodb+srv://hackpsu2025cluster.5qq8y0i.mongodb.net/" --apiVersion 1 --username s
