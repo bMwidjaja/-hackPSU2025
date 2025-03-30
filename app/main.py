@@ -60,7 +60,8 @@ async def submit_score(request: Request):
     try:
         # Get JSON data from request
         data = await request.json()
-        
+        img = llm(data["image"])
+        score = img.rate_pic()
 
         """
         # Validate request data
@@ -68,23 +69,14 @@ async def submit_score(request: Request):
             raise HTTPException(status_code=400, detail="Missing name or image data")
         """
         # For simplicity, always return score of 1
-        score = 1
-        
-        # Save the image
-        base64_image = data["image"]
+    
         
         # Store rating data
-        rating = Rating(user_id=user_id, image_id=image_id, score=score, timestamp=datetime.now())
+        
         await rating_collection.insert_one(rating.model_dump())
         
         
-        return {
-            "message": "Score submitted successfully",
-            "user_id": user_id,
-            "image_id": image_id,
-            "score": score,
-            "name": data["name"]
-        }
+        return 
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
