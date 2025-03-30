@@ -5,6 +5,7 @@ from google.genai import types
 import PIL.Image
 
 #implement with database later
+#test 3
 image = PIL.Image.open("C:/Users/phone/Downloads/ugly.jpg")
 
 client = genai.Client(api_key="API KEY")
