@@ -11,19 +11,19 @@ import json
 import base64
 from PIL import Image
 import io
-from llm import Llm  # Import the LLM class
+from app.llm import Llm  # Import the LLM class
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
 
 # Add CORS middleware to allow requests from your frontend
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],  # Allows all origins
-    allow_credentials=True,
-    allow_methods=["*"],  # Allows all methods
-    allow_headers=["*"],  # Allows all headers
-)
+# app.add_middleware(
+#     CORSMiddleware,
+#     allow_origins=["*"],  # Allows all origins
+#     allow_credentials=True,
+#     allow_methods=["*"],  # Allows all methods
+#     allow_headers=["*"],  # Allows all headers
+# )
 
 # MongoDB connection
 MONGODB_URL = "mongodb+srv://JunesPH:3koreankid45@hackpsu2025cluster.5qq8y0i.mongodb.net/hackpsu?retryWrites=true&w=majority"
@@ -67,18 +67,24 @@ class ScoreEntry(BaseModel):
             ObjectId: lambda x: str(x)
         }
 
+@app.get("/echo")
+def echo():
+    return {"message": "This is the echo endpoint"}
+
 @app.post("/submit-score/")
 async def submit_score(request: Request):
     try:
+        print("WE got a request")
         # Get JSON data from request
         data = await request.json()
+        print(f"this is the data: {data}")
         
         # Validate request data
         if not data.get("name") or not data.get("image"):
             raise HTTPException(status_code=400, detail="Missing name or image data")
         
         # Process image with LLM
-        llm = Llm()  # Create an instance of the LLM class
+        llm = Llm()  # Create an instancje of the LLM class
         score = llm.rate_pic(data["image"])  # Get the score from LLM
         
         # Create document to insert
