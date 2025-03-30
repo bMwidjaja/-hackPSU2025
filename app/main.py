@@ -1,4 +1,4 @@
-from fastapi import Form, FastAPI, File, UploadFile, HTTPException
+from fastapi import FastAPI, Request, HTTPException
 from pydantic import BaseModel
 from typing import List, Optional
 import shutil
@@ -7,19 +7,16 @@ from datetime import datetime
 from pymongo import MongoClient
 from motor import motor_asyncio
 from bson import ObjectId
+import json
+import base64
+from PIL import Image
+import io
 
 app = FastAPI()
 
 # MongoDB connection
 MONGODB_URL = "mongodb+srv://JunesPH:3koreankid45@hackpsu2025cluster.5qq8y0i.mongodb.net/hackpsu?retryWrites=true&w=majority"
-try:
-    client = motor_asyncio.AsyncIOMotorClient(MONGODB_URL)
-    # Test the connection
-    client.admin.command('ping')
-    print("Successfully connected to MongoDB!")
-except Exception as e:
-    print(f"Failed to connect to MongoDB: {e}")
-    raise
+client = motor_asyncio.AsyncIOMotorClient(MONGODB_URL)
 
 # Get the collections from MongoDB
 users_collection = client.hackpsu.users
@@ -52,41 +49,54 @@ class Rating(BaseModel):
             ObjectId: lambda x: str(x)
         }
 
+class ImageRequest(BaseModel):
+    name: str
+    image: str  # Base64 encoded image
+
 @app.post("/submit-score/")
-async def submit_score(
-    name: str = Form(...),
-    image: UploadFile = File(...)
-):
-    # Save the uploaded image
-    # bullshit
-    image_path = os.path.join(UPLOAD_DIR, f"{name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg")
-    with open(image_path, "wb") as buffer:
-        shutil.copyfileobj(image.file, buffer)
-    
-    #The .model_dump() is to convert the Pydantic model to a dictionary so that it can be converted/inserted into the MongoDB collection
-    # Create user entry
-    # bullshit
-    user = User(name=name, timestamp=datetime.now())
-    #Await is used to wait for the insert_one to finish before moving on to the next step
-    user_result = await users_collection.insert_one(user.model_dump())
-    user_id = str(user_result.inserted_id)
-    
-    # Create image entry
-
-    image_entry = Image(user_id=user_id, image_path=image_path, timestamp=datetime.now())
-    image_result = await images_collection.insert_one(image_entry.model_dump())
-    image_id = str(image_result.inserted_id)
-
-    # brandons code here
-
-    
-    # Create rating entry (score from LLM will be added later)
-    # pass results here and put it in db
-    rating = Rating(user_id=user_id, image_id=image_id, score=0, timestamp=datetime.now())
-    await rating_collection.insert_one(rating.model_dump())
-    
-    # return brandons shit to the user here
-    return {"message": "Score submitted successfully", "user_id": user_id, "image_id": image_id}
+async def submit_score(request: Request):
+    try:
+        # Get JSON data from request
+        data = await request.json()
+        
+        # Validate request data
+        if not data.get("name") or not data.get("image"):
+            raise HTTPException(status_code=400, detail="Missing name or image data")
+        
+        # For simplicity, always return score of 1
+        score = 1
+        
+        # Save the image
+        image_path = os.path.join(UPLOAD_DIR, f"{data['name']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg")
+        image_bytes = base64.b64decode(data["image"])
+        with open(image_path, "wb") as f:
+            f.write(image_bytes)
+        
+        # Store user data
+        user = User(name=data["name"], timestamp=datetime.now())
+        user_result = await users_collection.insert_one(user.model_dump())
+        user_id = str(user_result.inserted_id)
+        
+        # Store image data
+        image_entry = Image(user_id=user_id, image_path=image_path, timestamp=datetime.now())
+        image_result = await images_collection.insert_one(image_entry.model_dump())
+        image_id = str(image_result.inserted_id)
+        
+        # Store rating data
+        rating = Rating(user_id=user_id, image_id=image_id, score=score, timestamp=datetime.now())
+        await rating_collection.insert_one(rating.model_dump())
+        
+        
+        return {
+            "message": "Score submitted successfully",
+            "user_id": user_id,
+            "image_id": image_id,
+            "score": score,
+            "name": data["name"]
+        }
+        
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
 
 @app.get("/leaderboard/")
 async def get_leaderboard():
