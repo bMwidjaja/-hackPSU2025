@@ -16,3 +16,8 @@ dependencies = [
 [lint]
 ignore = ["F401"]
 select = ["E", "F", "I"]
+
+[dependency-groups]
+dev = [
+    "ruff>=0.11.2",
+]
