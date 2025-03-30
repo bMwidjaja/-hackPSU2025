@@ -4,26 +4,53 @@ from typing import List, Optional
 import shutil
 import os
 from datetime import datetime
+from pymongo import MongoClient
+from motor import motor_asyncio
+from bson import ObjectId
 
 app = FastAPI()
+
+# MongoDB connection
+MONGODB_URL = "mongodb+srv://JunesPH:3koreankid45@hackpsu2025cluster.5qq8y0i.mongodb.net/hackpsu?retryWrites=true&w=majority"
+try:
+    client = motor_asyncio.AsyncIOMotorClient(MONGODB_URL)
+    # Test the connection
+    client.admin.command('ping')
+    print("Successfully connected to MongoDB!")
+except Exception as e:
+    print(f"Failed to connect to MongoDB: {e}")
+    raise
+
+# Get the collections from MongoDB
+users_collection = client.hackpsu.users
+images_collection = client.hackpsu.images
+rating_collection = client.hackpsu.rating
 
 # Create a directory to store uploaded images if it doesn't exist
 UPLOAD_DIR = "uploads"
 os.makedirs(UPLOAD_DIR, exist_ok=True)
 
-class LeaderboardEntry(BaseModel):
+class User(BaseModel):
     name: str
-    score: int
+    timestamp: datetime
+
+class Image(BaseModel):
+    user_id: str
     image_path: str
     timestamp: datetime
 
-class LeaderboardUpdate(BaseModel):
-    name: Optional[str] = None
-    score: Optional[int] = None
-    image_path: Optional[str] = None
+class Rating(BaseModel):
+    user_id: str
+    image_id: str
+    score: int
+    timestamp: datetime
 
-# In-memory storage for leaderboard entries
-leaderboard_entries: List[LeaderboardEntry] = []
+    #This is to convert the datetime and ObjectId that's Python-specific to a JSON format
+    class Config:
+        json_encoders = {
+            datetime: lambda x: x.isoformat(),
+            ObjectId: lambda x: str(x)
+        }
 
 @app.post("/submit-score/")
 async def submit_score(
@@ -31,57 +58,85 @@ async def submit_score(
     image: UploadFile = File(...)
 ):
     # Save the uploaded image
-    #os.path.join to create a full path to the image
-    #the f"{name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg" ensures uniqueness
-    
+    # bullshit
     image_path = os.path.join(UPLOAD_DIR, f"{name}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg")
-    #with open to open the image file in binary write mode (wb) 
-    #must be written as a binary file to prevent corruption
-    #buffer is a temporary storage for the image data
     with open(image_path, "wb") as buffer:
-        #copyfileobj to copy the image data from the uploaded file to the opened file (buffer)
         shutil.copyfileobj(image.file, buffer)
     
-    #Get score from LLM
-    score = 0  # This should be replaced with the LLM's score
+    #The .model_dump() is to convert the Pydantic model to a dictionary so that it can be converted/inserted into the MongoDB collection
+    # Create user entry
+    # bullshit
+    user = User(name=name, timestamp=datetime.now())
+    #Await is used to wait for the insert_one to finish before moving on to the next step
+    user_result = await users_collection.insert_one(user.model_dump())
+    user_id = str(user_result.inserted_id)
     
-    # Create new leaderboard entry
-    entry = LeaderboardEntry(
-        name=name,
-        score=score,
-        image_path=image_path,
-        timestamp=datetime.now()
-    )
+    # Create image entry
+
+    image_entry = Image(user_id=user_id, image_path=image_path, timestamp=datetime.now())
+    image_result = await images_collection.insert_one(image_entry.model_dump())
+    image_id = str(image_result.inserted_id)
+
+    # brandons code here
+
     
-    # Add to leaderboard
-    leaderboard_entries.append(entry)
+    # Create rating entry (score from LLM will be added later)
+    # pass results here and put it in db
+    rating = Rating(user_id=user_id, image_id=image_id, score=0, timestamp=datetime.now())
+    await rating_collection.insert_one(rating.model_dump())
     
-    # Sort leaderboard by score (highest first)
-    leaderboard_entries.sort(key=lambda x: x.score, reverse=True)
-    
-    return {"message": "Score submitted successfully", "entry": entry}
+    # return brandons shit to the user here
+    return {"message": "Score submitted successfully", "user_id": user_id, "image_id": image_id}
 
 @app.get("/leaderboard/")
-def get_leaderboard():
-    return leaderboard_entries
+async def get_leaderboard():
+    # Get all ratings sorted by score in descending order
+    #The pipeline is to join the users collection with the ratings collection
+    pipeline = [
+        #Sort the ratings by score in descending order
+        {"$sort": {"score": -1}},
+        {   #Join both the users collection and the ratings collection
+            "$lookup": {
+                "from": "users",
+                "localField": "user_id",
+                "foreignField": "_id",
+                "as": "user"
+            }
+        },
+        {"$unwind": "$user"}
+    ]
+    
+    cursor = rating_collection.aggregate(pipeline)
+    entries = []
+    async for entry in cursor:
+        entry["_id"] = str(entry["_id"])
+        entry["user_id"] = str(entry["user_id"])
+        entry["user"]["_id"] = str(entry["user"]["_id"])
+        entries.append(entry)
+    return entries
 
-@app.patch("/leaderboard/{entry_index}")
-async def update_leaderboard_entry(entry_index: int, update: LeaderboardUpdate):
-    if entry_index < 0 or entry_index >= len(leaderboard_entries):
-        raise HTTPException(status_code=404, detail="Entry not found")
+@app.patch("/leaderboard/{rating_id}")
+async def update_leaderboard_entry(rating_id: str, score: int):
+    try:
+        object_id = ObjectId(rating_id)
+    except:
+        raise HTTPException(status_code=400, detail="Invalid rating ID")
     
-    entry = leaderboard_entries[entry_index]
+    # Update the rating
+    await rating_collection.update_one(
+        {"_id": object_id},
+        {"$set": {"score": score}}
+    )
     
-    # Update only the provided fields
-    if update.name is not None:
-        entry.name = update.name
-    if update.score is not None:
-        entry.score = update.score
-    if update.image_path is not None:
-        entry.image_path = update.image_path
+    # Get the updated entry
+    updated_entry = await rating_collection.find_one({"_id": object_id})
+    if not updated_entry:
+        raise HTTPException(status_code=404, detail="Rating not found")
     
-    # Re-sort the leaderboard
-    leaderboard_entries.sort(key=lambda x: x.score, reverse=True)
+    updated_entry["_id"] = str(updated_entry["_id"])
+    updated_entry["user_id"] = str(updated_entry["user_id"])
     
-    return {"message": "Entry updated successfully", "entry": entry}
+    return {"message": "Rating updated successfully", "entry": updated_entry}
+
+#Could create a new file to create the rate function
 
