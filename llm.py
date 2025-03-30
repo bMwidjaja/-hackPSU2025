@@ -4,7 +4,7 @@ from google.genai import types
 
 from PIL import Image
 
-class llm:
+class Llm:
     def __init__(self, base64_string):
         if self._is_valid_base64(base64_string):
             self.base64_string = base64_string

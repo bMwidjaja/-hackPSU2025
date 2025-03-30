@@ -11,7 +11,7 @@ import json
 import base64
 from PIL import Image
 import io
-from llm import LLM  # Import the LLM class
+from llm import Llm  # Import the LLM class
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI()
@@ -78,7 +78,7 @@ async def submit_score(request: Request):
             raise HTTPException(status_code=400, detail="Missing name or image data")
         
         # Process image with LLM
-        llm = LLM()  # Create an instance of the LLM class
+        llm = Llm()  # Create an instance of the LLM class
         score = llm.rate_pic(data["image"])  # Get the score from LLM
         
         # Create document to insert
