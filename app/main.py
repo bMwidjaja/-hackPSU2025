@@ -11,6 +11,8 @@ import json
 import base64
 from PIL import Image
 import io
+import llm
+import base64
 
 app = FastAPI()
 
@@ -59,28 +61,17 @@ async def submit_score(request: Request):
         # Get JSON data from request
         data = await request.json()
         
+
+        """
         # Validate request data
         if not data.get("name") or not data.get("image"):
             raise HTTPException(status_code=400, detail="Missing name or image data")
-        
+        """
         # For simplicity, always return score of 1
         score = 1
         
         # Save the image
-        image_path = os.path.join(UPLOAD_DIR, f"{data['name']}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.jpg")
-        image_bytes = base64.b64decode(data["image"])
-        with open(image_path, "wb") as f:
-            f.write(image_bytes)
-        
-        # Store user data
-        user = User(name=data["name"], timestamp=datetime.now())
-        user_result = await users_collection.insert_one(user.model_dump())
-        user_id = str(user_result.inserted_id)
-        
-        # Store image data
-        image_entry = Image(user_id=user_id, image_path=image_path, timestamp=datetime.now())
-        image_result = await images_collection.insert_one(image_entry.model_dump())
-        image_id = str(image_result.inserted_id)
+        base64_image = data["image"]
         
         # Store rating data
         rating = Rating(user_id=user_id, image_id=image_id, score=score, timestamp=datetime.now())
