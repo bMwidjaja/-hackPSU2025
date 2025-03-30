@@ -135,6 +135,7 @@ source = { virtual = "." }
 dependencies = [
     { name = "fastapi", extra = ["standard"] },
     { name = "motor" },
+    { name = "python-dotenv" },
 ]
 
 [package.dev-dependencies]
@@ -146,6 +147,7 @@ dev = [
 requires-dist = [
     { name = "fastapi", extras = ["standard"], specifier = ">=0.115.12" },
     { name = "motor", specifier = ">=3.7.0" },
+    { name = "python-dotenv", specifier = ">=1.1.0" },
 ]
 
 [package.metadata.requires-dev]
