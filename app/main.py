@@ -1,8 +1,8 @@
 from fastapi import FastAPI
+from app.db.core import lifespan
 from app.routes import images, leaderboard
-from app.environment.variables import MONGO_CONNECTION_STRING
 
-app = FastAPI()
+app = FastAPI(lifespan=lifespan)
 
 app.include_router(images.router)
 app.include_router(leaderboard.router)

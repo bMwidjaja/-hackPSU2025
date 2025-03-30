@@ -7,6 +7,7 @@ from app.logging import log
 load_dotenv()
 
 MONGO_CONNECTION_STRING: str = os.getenv("MONGO_CONNECTION_STRING", "")
+MONGO_DATABASE: str = os.getenv("MONGO_DATABASE", "")
 
 _environment_variables = locals().copy()
 
