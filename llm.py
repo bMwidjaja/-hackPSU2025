@@ -4,7 +4,7 @@ from google.genai import types
 
 import PIL.Image
 
-//testing branch push
+#testing branch push
 #implement with database later
 image = PIL.Image.open("C:/Users/phone/Downloads/ugly.jpg")
 
